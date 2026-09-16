@@ -1,0 +1,217 @@
+-- [[ สคริปต์: พี่คินสุดหล่อ56 (Mobile Edition) ]] --
+
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
+local Window = Library.CreateLib("พี่คินสุดหล่อ56", "DarkTheme")
+
+-- Variables
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Camera = workspace.CurrentCamera
+
+local Flying = false
+local FlySpeed = 50
+local Noclip = false
+local AimbotEnabled = false
+local ESPEnabled = false
+local HitboxEnabled = false
+local HitboxSize = 10
+
+-- ==================== [ สร้างปุ่มลอยเปิด/ปิดเมนูสำหรับมือถือ ] ====================
+local ScreenGui = Instance.new("ScreenGui")
+local ToggleButton = Instance.new("TextButton")
+local UICorner = Instance.new("UICorner")
+
+ScreenGui.Name = "KinMobileGui"
+ScreenGui.Parent = game:GetService("CoreGui")
+ScreenGui.ResetOnSpawn = false
+
+ToggleButton.Name = "ToggleButton"
+ToggleButton.Parent = ScreenGui
+ToggleButton.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+ToggleButton.Position = UDim2.new(0.05, 0, 0.2, 0)
+ToggleButton.Size = UDim2.new(0, 60, 0, 60)
+ToggleButton.Font = Enum.Font.SourceSansBold
+ToggleButton.Text = "พี่คิน"
+ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleButton.TextSize = 18.000
+ToggleButton.Active = true
+ToggleButton.Draggable = true -- ทำให้ลากย้ายตำแหน่งปุ่มลอยได้บนหน้าจอมือถือ
+
+UICorner.CornerRadius = UDim.new(0, 30)
+UICorner.Parent = ToggleButton
+
+ToggleButton.MouseButton1Click:Connect(function()
+    Library:ToggleUI()
+end)
+
+-- ==================== [ TAB 1: Main (การเคลื่อนที่ & บิน) ] ====================
+local MainTab = Window:NewTab("Main")
+local MainSection = MainTab:NewSection("การเคลื่อนที่ & บิน")
+
+MainSection:NewToggle("เปิด/ปิด บิน (Fly)", "เปิดปิดระบบบิน", function(state)
+    Flying = state
+    local Char = LocalPlayer.Character
+    if Char and Char:FindFirstChild("HumanoidRootPart") then
+        if Flying then
+            local BG = Instance.new("BodyGyro", Char.HumanoidRootPart)
+            local BV = Instance.new("BodyVelocity", Char.HumanoidRootPart)
+            BG.Name = "FlyBG"
+            BV.Name = "FlyBV"
+            BG.maxTorque = Vector3.new(9e9, 9e9, 9e9)
+            BG.P = 9e4
+            BV.maxForce = Vector3.new(9e9, 9e9, 9e9)
+            
+            task.spawn(function()
+                while Flying do
+                    RunService.RenderStepped:Wait()
+                    BG.cframe = Camera.CFrame
+                    BV.velocity = Camera.CFrame.LookVector * FlySpeed
+                end
+                BG:Destroy()
+                BV:Destroy()
+            end)
+        end
+    end
+end)
+
+MainSection:NewSlider("ความเร็วการบิน", "ปรับความเร็วบิน", 300, 10, function(s)
+    FlySpeed = s
+end)
+
+MainSection:NewSlider("ความเร็วการเดิน (WalkSpeed)", "ปรับความเร็ววิ่ง", 300, 16, function(s)
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        LocalPlayer.Character.Humanoid.WalkSpeed = s
+    end
+end)
+
+MainSection:NewToggle("เดินทะลุ (Noclip)", "เดินทะลุกำแพง", function(state)
+    Noclip = state
+end)
+
+RunService.Stepped:Connect(function()
+    if Noclip and LocalPlayer.Character then
+        for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
+        end
+    end
+end)
+
+-- ==================== [ TAB 2: Teleport (วาร์ป) ] ====================
+local TP_Tab = Window:NewTab("Teleport")
+local TP_Section = TP_Tab:NewSection("ระบบวาร์ป")
+
+TP_Section:NewButton("สุ่มวาร์ปไปหาผู้เล่นอื่น", "วาร์ปไปหาผู้เล่นแบบสุ่ม", function()
+    local allPlayers = {}
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            table.insert(allPlayers, p)
+        end
+    end
+    if #allPlayers > 0 then
+        local randomPlayer = allPlayers[math.random(1, #allPlayers)]
+        LocalPlayer.Character.HumanoidRootPart.CFrame = randomPlayer.Character.HumanoidRootPart.CFrame
+    end
+end)
+
+TP_Section:NewButton("แตะหน้าจอเพื่อวาร์ป (Touch/Click TP)", "แตะที่จุดไหนบนหน้าจอเพื่อวาร์ปไปตรงนั้น", function()
+    local Mouse = LocalPlayer:GetMouse()
+    if Mouse.Hit then
+        LocalPlayer.Character:MoveTo(Mouse.Hit.p)
+    end
+end)
+
+-- ==================== [ TAB 3: Visual & Combat (ESP / Hitbox / Aimbot) ] ====================
+local CombatTab = Window:NewTab("Combat & Visual")
+local CombatSection = CombatTab:NewSection("การมองเห็น & ล็อคเป้า")
+
+CombatSection:NewToggle("เปิด ESP (มองทะลุ)", "แสดงตำแหน่งผู้เล่นอื่น", function(state)
+    ESPEnabled = state
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character then
+            if ESPEnabled then
+                if not p.Character:FindFirstChild("Highlight") then
+                    local hl = Instance.new("Highlight", p.Character)
+                    hl.FillColor = Color3.fromRGB(255, 0, 0)
+                end
+            else
+                if p.Character:FindFirstChild("Highlight") then
+                    p.Character.Highlight:Destroy()
+                end
+            end
+        end
+    end
+end)
+
+CombatSection:NewToggle("ขยาย Hitbox", "เปิดขนาด Hitbox หัว/ตัว", function(state)
+    HitboxEnabled = state
+end)
+
+CombatSection:NewSlider("ขนาด Hitbox", "ปรับขนาด Hitbox", 50, 2, function(s)
+    HitboxSize = s
+end)
+
+RunService.RenderStepped:Connect(function()
+    if HitboxEnabled then
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                p.Character.HumanoidRootPart.Size = Vector3.new(HitboxSize, HitboxSize, HitboxSize)
+                p.Character.HumanoidRootPart.Transparency = 0.7
+                p.Character.HumanoidRootPart.BrickColor = BrickColor.new("Red")
+                p.Character.HumanoidRootPart.Material = Enum.Material.Neon
+                p.Character.HumanoidRootPart.CanCollide = false
+            end
+        end
+    end
+end)
+
+CombatSection:NewToggle("ล็อคเป้า (Aimbot)", "ล็อคเป้าใส่ผู้เล่นที่ใกล้ที่สุด", function(state)
+    AimbotEnabled = state
+end)
+
+local function GetClosestPlayer()
+    local closest = nil
+    local shortestDistance = math.huge
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Head") then
+            local pos = Camera:WorldToViewportPoint(p.Character.Head.Position)
+            local magnitude = (Vector2.new(pos.X, pos.Y) - Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)).Magnitude
+            if magnitude < shortestDistance then
+                closest = p
+                shortestDistance = magnitude
+            end
+        end
+    end
+    return closest
+end
+
+RunService.RenderStepped:Connect(function()
+    if AimbotEnabled then
+        local target = GetClosestPlayer()
+        if target and target.Character and target.Character:FindFirstChild("Head") then
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Character.Head.Position)
+        end
+    end
+end)
+
+-- ==================== [ TAB 4: Settings (FOV & Boost FPS) ] ====================
+local SettingsTab = Window:NewTab("Settings")
+local SettingsSection = SettingsTab:NewSection("การตั้งค่าระบบ")
+
+SettingsSection:NewSlider("ปรับระยะ FOV", "ปรับมุมมองสายตา", 120, 70, function(s)
+    Camera.FieldOfView = s
+end)
+
+SettingsSection:NewButton("Boost FPS (ลดกราฟิกเพิ่มความลื่น)", "ลบเงาและปรับพื้นผิวเพื่อความลื่นบนมือถือ", function()
+    for _, v in pairs(game:GetDescendants()) do
+        if v:IsA("Part") or v:IsA("UnionOperation") or v:IsA("MeshPart") then
+            v.Material = Enum.Material.SmoothPlastic
+        elseif v:IsA("Decal") or v:IsA("Texture") then
+            v:Destroy()
+        end
+    end
+    game:GetService("Lighting").GlobalShadows = false
+end)
