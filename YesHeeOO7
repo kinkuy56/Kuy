@@ -1,15 +1,18 @@
--- [[ สคริปต์: พี่คินสุดหล่อ56 (Mobile Edition) ]] --
+-- [[ สคริปต์: พี่คินสุดหล่อ56 (Mobile Touch Screen Edition) ]] --
 
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
-local Window = Library.CreateLib("พี่คินสุดหล่อ56", "DarkTheme")
-
--- Variables
+local CoreGui = game:GetService("CoreGui")
 local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
+-- ลบ UI เก่าออกหากเปิดซ้ำ
+if CoreGui:FindFirstChild("KinGuiSystem") then
+    CoreGui.KinGuiSystem:Destroy()
+end
+
+-- Variables
 local Flying = false
 local FlySpeed = 50
 local Noclip = false
@@ -18,39 +21,169 @@ local ESPEnabled = false
 local HitboxEnabled = false
 local HitboxSize = 10
 
--- ==================== [ สร้างปุ่มลอยเปิด/ปิดเมนูสำหรับมือถือ ] ====================
-local ScreenGui = Instance.new("ScreenGui")
-local ToggleButton = Instance.new("TextButton")
-local UICorner = Instance.new("UICorner")
+-- ฟังก์ชั่นทำให้ UI ลากย้ายตำแหน่งได้ด้วยนิ้วมือถือ
+local function MakeDraggable(gui)
+    local dragging, dragInput, dragStart, startPos
+    gui.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = gui.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+    gui.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            gui.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+end
 
-ScreenGui.Name = "KinMobileGui"
-ScreenGui.Parent = game:GetService("CoreGui")
+-- ScreenGui หลัก
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "KinGuiSystem"
+ScreenGui.Parent = CoreGui
 ScreenGui.ResetOnSpawn = false
 
-ToggleButton.Name = "ToggleButton"
-ToggleButton.Parent = ScreenGui
-ToggleButton.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-ToggleButton.Position = UDim2.new(0.05, 0, 0.2, 0)
-ToggleButton.Size = UDim2.new(0, 60, 0, 60)
-ToggleButton.Font = Enum.Font.SourceSansBold
-ToggleButton.Text = "พี่คิน"
-ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-ToggleButton.TextSize = 18.000
-ToggleButton.Active = true
-ToggleButton.Draggable = true -- ทำให้ลากย้ายตำแหน่งปุ่มลอยได้บนหน้าจอมือถือ
+-- 1. ปุ่มลอยเปิด/ปิด
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Name = "ToggleBtn"
+ToggleBtn.Parent = ScreenGui
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+ToggleBtn.Position = UDim2.new(0.05, 0, 0.2, 0)
+ToggleBtn.Size = UDim2.new(0, 65, 0, 65)
+ToggleBtn.Font = Enum.Font.SourceSansBold
+ToggleBtn.Text = "พี่คิน"
+ToggleBtn.TextColor3 = Color3.fromRGB(255, 215, 0)
+ToggleBtn.TextSize = 18
+local ToggleCorner = Instance.new("UICorner", ToggleBtn)
+ToggleCorner.CornerRadius = UDim.new(0, 35)
+MakeDraggable(ToggleBtn)
 
-UICorner.CornerRadius = UDim.new(0, 30)
-UICorner.Parent = ToggleButton
+-- 2. เมนูหลัก
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+MainFrame.Position = UDim2.new(0.2, 0, 0.15, 0)
+MainFrame.Size = UDim2.new(0, 320, 0, 380)
+MainFrame.ClipsDescendants = true
+local MainCorner = Instance.new("UICorner", MainFrame)
+MainCorner.CornerRadius = UDim.new(0, 10)
 
-ToggleButton.MouseButton1Click:Connect(function()
-    Library:ToggleUI()
+-- แถบหัวข้อ (ใช้สำหรับแตะลากย้ายหน้าต่าง)
+local TitleBar = Instance.new("Frame")
+TitleBar.Name = "TitleBar"
+TitleBar.Parent = MainFrame
+TitleBar.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+TitleBar.Size = UDim2.new(1, 0, 0, 40)
+MakeDraggable(TitleBar)
+MakeDraggable(MainFrame)
+
+local TitleText = Instance.new("TextLabel")
+TitleText.Parent = TitleBar
+TitleText.Size = UDim2.new(1, -40, 1, 0)
+TitleText.Position = UDim2.new(0, 10, 0, 0)
+TitleText.Font = Enum.Font.SourceSansBold
+TitleText.Text = "พี่คินสุดหล่อ56 (ลากย้ายได้)"
+TitleText.TextColor3 = Color3.fromRGB(255, 255, 255)
+TitleText.TextSize = 18
+TitleText.TextXAlignment = Enum.TextXAlignment.Left
+TitleText.BackgroundTransparency = 1
+
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Parent = TitleBar
+CloseBtn.Position = UDim2.new(1, -35, 0, 5)
+CloseBtn.Size = UDim2.new(0, 30, 0, 30)
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 50, 50)
+CloseBtn.TextSize = 20
+CloseBtn.Font = Enum.Font.SourceSansBold
+CloseBtn.BackgroundTransparency = 1
+
+CloseBtn.MouseButton1Click:Connect(function()
+    MainFrame.Visible = false
 end)
 
--- ==================== [ TAB 1: Main (การเคลื่อนที่ & บิน) ] ====================
-local MainTab = Window:NewTab("Main")
-local MainSection = MainTab:NewSection("การเคลื่อนที่ & บิน")
+ToggleBtn.MouseButton1Click:Connect(function()
+    MainFrame.Visible = not MainFrame.Visible
+end)
 
-MainSection:NewToggle("เปิด/ปิด บิน (Fly)", "เปิดปิดระบบบิน", function(state)
+-- Container โซนเนื้อหา
+local ContentScroll = Instance.new("ScrollingFrame")
+ContentScroll.Parent = MainFrame
+ContentScroll.Position = UDim2.new(0, 5, 0, 45)
+ContentScroll.Size = UDim2.new(1, -10, 1, -50)
+ContentScroll.BackgroundTransparency = 1
+ContentScroll.ScrollBarThickness = 6
+
+local UIListLayout = Instance.new("UIListLayout")
+UIListLayout.Parent = ContentScroll
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Padding = UDim.new(0, 8)
+
+UIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    ContentScroll.CanvasSize = UDim2.new(0, 0, 0, UIListLayout.AbsoluteContentSize.Y + 10)
+end)
+
+-- ฟังก์ชั่นสร้างปุ่มกด
+local function CreateButton(text, callback)
+    local btn = Instance.new("TextButton")
+    btn.Parent = ContentScroll
+    btn.Size = UDim2.new(1, 0, 0, 35)
+    btn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.SourceSansBold
+    btn.TextSize = 16
+    local corner = Instance.new("UICorner", btn)
+    corner.CornerRadius = UDim.new(0, 6)
+    btn.MouseButton1Click:Connect(callback)
+    return btn
+end
+
+-- ฟังก์ชั่นสร้างปุ่ม สวิตช์ เปิด/ปิด
+local function CreateToggle(text, callback)
+    local enabled = false
+    local btn = Instance.new("TextButton")
+    btn.Parent = ContentScroll
+    btn.Size = UDim2.new(1, 0, 0, 35)
+    btn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    btn.Text = text .. " : [ OFF ]"
+    btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    btn.Font = Enum.Font.SourceSansBold
+    btn.TextSize = 16
+    local corner = Instance.new("UICorner", btn)
+    corner.CornerRadius = UDim.new(0, 6)
+    
+    btn.MouseButton1Click:Connect(function()
+        enabled = not enabled
+        if enabled then
+            btn.Text = text .. " : [ ON ]"
+            btn.TextColor3 = Color3.fromRGB(50, 255, 50)
+        else
+            btn.Text = text .. " : [ OFF ]"
+            btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+        end
+        callback(enabled)
+    end)
+    return btn
+end
+
+-- ==================== [ ระบบปุ่มฟังชั่นต่างๆ ] ====================
+
+-- 1. บิน
+CreateToggle("บิน (Fly)", function(state)
     Flying = state
     local Char = LocalPlayer.Character
     if Char and Char:FindFirstChild("HumanoidRootPart") then
@@ -76,17 +209,21 @@ MainSection:NewToggle("เปิด/ปิด บิน (Fly)", "เปิดป
     end
 end)
 
-MainSection:NewSlider("ความเร็วการบิน", "ปรับความเร็วบิน", 300, 10, function(s)
-    FlySpeed = s
-end)
-
-MainSection:NewSlider("ความเร็วการเดิน (WalkSpeed)", "ปรับความเร็ววิ่ง", 300, 16, function(s)
+-- 2. ปรับความเร็วเดิน
+CreateButton("วิ่งเร็ว (WalkSpeed 100)", function()
     if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-        LocalPlayer.Character.Humanoid.WalkSpeed = s
+        LocalPlayer.Character.Humanoid.WalkSpeed = 100
     end
 end)
 
-MainSection:NewToggle("เดินทะลุ (Noclip)", "เดินทะลุกำแพง", function(state)
+CreateButton("ความเร็วเดินปกติ (WalkSpeed 16)", function()
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        LocalPlayer.Character.Humanoid.WalkSpeed = 16
+    end
+end)
+
+-- 3. เดินทะลุ
+CreateToggle("เดินทะลุ (Noclip)", function(state)
     Noclip = state
 end)
 
@@ -100,11 +237,8 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- ==================== [ TAB 2: Teleport (วาร์ป) ] ====================
-local TP_Tab = Window:NewTab("Teleport")
-local TP_Section = TP_Tab:NewSection("ระบบวาร์ป")
-
-TP_Section:NewButton("สุ่มวาร์ปไปหาผู้เล่นอื่น", "วาร์ปไปหาผู้เล่นแบบสุ่ม", function()
+-- 4. วาร์ป
+CreateButton("สุ่มวาร์ปไปหาผู้เล่นอื่น", function()
     local allPlayers = {}
     for _, p in pairs(Players:GetPlayers()) do
         if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
@@ -117,18 +251,15 @@ TP_Section:NewButton("สุ่มวาร์ปไปหาผู้เล่�
     end
 end)
 
-TP_Section:NewButton("แตะหน้าจอเพื่อวาร์ป (Touch/Click TP)", "แตะที่จุดไหนบนหน้าจอเพื่อวาร์ปไปตรงนั้น", function()
+CreateButton("แตะหน้าจอแล้ววาร์ป (Click TP)", function()
     local Mouse = LocalPlayer:GetMouse()
     if Mouse.Hit then
         LocalPlayer.Character:MoveTo(Mouse.Hit.p)
     end
 end)
 
--- ==================== [ TAB 3: Visual & Combat (ESP / Hitbox / Aimbot) ] ====================
-local CombatTab = Window:NewTab("Combat & Visual")
-local CombatSection = CombatTab:NewSection("การมองเห็น & ล็อคเป้า")
-
-CombatSection:NewToggle("เปิด ESP (มองทะลุ)", "แสดงตำแหน่งผู้เล่นอื่น", function(state)
+-- 5. ESP & Hitbox
+CreateToggle("มองทะลุ (ESP)", function(state)
     ESPEnabled = state
     for _, p in pairs(Players:GetPlayers()) do
         if p ~= LocalPlayer and p.Character then
@@ -146,12 +277,8 @@ CombatSection:NewToggle("เปิด ESP (มองทะลุ)", "แสด�
     end
 end)
 
-CombatSection:NewToggle("ขยาย Hitbox", "เปิดขนาด Hitbox หัว/ตัว", function(state)
+CreateToggle("ขยาย Hitbox", function(state)
     HitboxEnabled = state
-end)
-
-CombatSection:NewSlider("ขนาด Hitbox", "ปรับขนาด Hitbox", 50, 2, function(s)
-    HitboxSize = s
 end)
 
 RunService.RenderStepped:Connect(function()
@@ -168,7 +295,8 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
-CombatSection:NewToggle("ล็อคเป้า (Aimbot)", "ล็อคเป้าใส่ผู้เล่นที่ใกล้ที่สุด", function(state)
+-- 6. ล็อคเป้า
+CreateToggle("ล็อคเป้า (Aimbot)", function(state)
     AimbotEnabled = state
 end)
 
@@ -197,15 +325,16 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- ==================== [ TAB 4: Settings (FOV & Boost FPS) ] ====================
-local SettingsTab = Window:NewTab("Settings")
-local SettingsSection = SettingsTab:NewSection("การตั้งค่าระบบ")
-
-SettingsSection:NewSlider("ปรับระยะ FOV", "ปรับมุมมองสายตา", 120, 70, function(s)
-    Camera.FieldOfView = s
+-- 7. FOV & Boost FPS
+CreateButton("ปรับ FOV กว้างขึ้น (100)", function()
+    Camera.FieldOfView = 100
 end)
 
-SettingsSection:NewButton("Boost FPS (ลดกราฟิกเพิ่มความลื่น)", "ลบเงาและปรับพื้นผิวเพื่อความลื่นบนมือถือ", function()
+CreateButton("ปรับ FOV ปกติ (70)", function()
+    Camera.FieldOfView = 70
+end)
+
+CreateButton("Boost FPS (ลดกราฟิก)", function()
     for _, v in pairs(game:GetDescendants()) do
         if v:IsA("Part") or v:IsA("UnionOperation") or v:IsA("MeshPart") then
             v.Material = Enum.Material.SmoothPlastic
